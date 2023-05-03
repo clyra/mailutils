@@ -1,0 +1,17 @@
+FROM python:alpine as builder
+
+WORKDIR /usr/src/
+
+RUN	apk add git curl busybox-extras binutils && \
+        git clone https://github.com/simonrob/email-oauth2-proxy.git && \
+        cd email-oauth2-proxy && \ 
+ 	python -m pip install -r requirements-no-gui.txt && \
+ 	pip install -U pyinstaller && \
+ 	pyinstaller --onefile emailproxy.py
+
+FROM alpine as oauth2-proxy
+RUN mkdir /app /conf
+COPY --from=builder /usr/src/email-oauth2-proxy/dist/emailproxy /app/emailproxy
+
+ENTRYPOINT ["/app/emailproxy", "--no-gui", "--external-auth"]
+CMD ["--config-file=/conf/emailproxy.config"]

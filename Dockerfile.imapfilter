@@ -1,0 +1,23 @@
+FROM python:alpine as builder
+
+WORKDIR /usr/src
+
+RUN apk add --update git lua-dev gcc make openssl-dev pcre2-dev g++ && \
+    git clone https://github.com/lefcha/imapfilter.git && \
+    cd imapfilter && \
+    make all 
+
+FROM python:alpine as imapfilter
+RUN apk add --update lua5.1 luarocks5.1 openssl pcre2  && \
+    luarocks-5.1 install htmlparser && \ 
+    pip install apprise
+RUN mkdir -p /app /conf /usr/local/bin /usr/local/share/imapfilter /usr/local/man/man1 /usr/local/man/man5
+COPY --from=builder /usr/src/imapfilter/src/imapfilter /usr/local/bin/
+COPY --from=builder /usr/src/imapfilter/src/*lua /usr/local/share/imapfilter/
+COPY --from=builder /usr/src/imapfilter/doc/imapfilter.1 /usr/local/man/man1/
+COPY --from=builder /usr/src/imapfilter/doc/imapfilter_config.5 /usr/local/man/man5/
+
+ENTRYPOINT [ "sh", "/conf/start-imapfilter.sh" ]
+
+
+#ln -s  /usr/lib/x86_64-linux-gnu/liblua5.4.so.0 /usr/lib/x86_64-linux-gnu/liblua.so

@@ -1,0 +1,226 @@
+[Email OAuth 2.0 Proxy configuration file]
+documentation = This is a sample Email OAuth 2.0 Proxy configuration file. Configure the proxy by adding items in the
+	[Server setup] and [Account setup] sections below. You may delete any servers or accounts that you do not intend to
+	use. Documentation is provided inline, with example setups for Gmail and Office 365 (though you will need to enter
+	your own desktop app API client credentials in the accounts section). Use the `Reload configuration file` menu
+	option (or restart the proxy) to apply any changes.
+warning = Do not commit changes to this file into a public repository (e.g., GitHub etc). While the proxy encrypts the
+	OAuth 2.0 tokens it obtains and saves on your behalf, it cannot protect these against offline brute-force attacks.
+
+
+[Server setup]
+documentation = Local servers are specified as demonstrated below where, for example, the section heading [IMAP-1993]
+	gives the type (which can be IMAP, POP or SMTP) and the local port number to listen on (i.e., 1993, etc). The local
+	port must be above 1023 (unless the proxy script is run via sudo), below 65536, and unique across local servers.
+	Multiple accounts can share the same server, however. Each server section must specify the `server_address` and
+	`server_port` of the remote server that it will be proxying - you can obtain these values from your email provider,
+	or use the details below for Office 365 and/or Gmail.
+	
+	To allow the proxy to operate, your email client must be set up to use an unencrypted connection for IMAP/SMTP/POP
+	(i.e., no STARTTLS or SSL/TLS, just plain login credentials). The proxy will create a secure connection on your
+	behalf to the remote server from the outset by default (i.e., implicit SSL/TLS); see below if STARTTLS is required.
+	
+	Server customisation:
+	- If your SMTP server uses the STARTTLS approach, add `starttls = True`, as shown in the [SMTP-1587] example below
+	(assumed to be False otherwise). With this parameter set, STARTTLS negotiation will be handled by the proxy on your
+	behalf (i.e., do not enable STARTTLS in your client). IMAP STARTTLS and POP STARTTLS are not currently supported.
+	
+	- The `local_address` property can be used to set an IP address or hostname for the proxy to listen on. Both IPv4
+	and IPv6 are supported. If not specified, this value is set to `localhost`. When using a hostname the proxy will
+	first resolve this to an IP address, preferring IPv6 over IPv4 if both are available. When running in an environment
+	with dual-stack support, the proxy will attempt to listen on both IPv4 and IPv6 hosts simultaneously. To explicitly
+	request this for the local host, set `local_address = ::`. Note also that tools such as `netstat` do not always
+	accurately show dual-stack mode; if in doubt it is worth actually testing both IPv4 and IPv6 connections.
+	
+	Advanced server configuration:
+	- In the standard configuration the channel between your email client and the proxy is unencrypted. This is not
+	normally of any concern since the proxy is typically a local-only service. However, if you prefer, you may provide
+	a `local_certificate_path` (e.g., /etc/letsencrypt/live/mail.example.net/fullchain.pem) and `local_key_path` (e.g.,
+	/etc/letsencrypt/live/mail.example.net/privkey.pem) for the server you are using the proxy with, and it will use
+	these to set up a secure connection between itself and your email client.
+
+[IMAP-1993]
+local_address = localhost
+server_address = outlook.office365.com
+server_port = 993
+
+[POP-1995]
+server_address = outlook.office365.com
+server_port = 995
+
+[SMTP-1587]
+server_address = smtp.office365.com
+server_port = 587
+starttls = True
+
+[IMAP-2993]
+server_address = imap.gmail.com
+server_port = 993
+
+[POP-2995]
+server_address = pop.gmail.com
+server_port = 995
+
+[SMTP-2465]
+server_address = smtp.gmail.com
+server_port = 465
+
+
+[Account setup]
+documentation = Accounts are specified using your email address as the section heading (e.g., [your.email@gmail.com],
+	etc, below). Account usernames (i.e., email addresses) must be unique - only one entry per account is permitted.
+	Each account section must provide values for `permission_url`, `token_url`, `oauth2_scope` and `redirect_uri`. If
+	you are adding an account for a service other than the examples shown below then the provider's documentation should
+	provide these details.
+	
+	You will also need to add your own `client_id` and `client_secret` values as indicated below. These can either be
+	reused from an existing source (such as another email client that supports OAuth 2.0), or you can register and use
+	your own desktop app API client credentials. See https://developers.google.com/identity/protocols/oauth2/native-app
+	and the Microsoft link below for details. Multiple accounts on the same server can use the same values for the
+	`client_id` and `client_secret` properties; just duplicate these in each account's entry below. Note that there are
+	also example account configurations for AOL and Yahoo Mail below, but these services are not currently accepting new
+	OAuth 2.0 client registrations with the mail access scope, so reusing existing credentials is the only option here.
+	
+	Once the proxy is correctly configured, after the first successful use of an account its access token details will
+	be cached for future use, encrypted with the IMAP/POP/SMTP password you used in your email client. By default this
+	configuration file is reused for caching (so it must be writable), but you can specify a different location or
+	method using the proxy's `--cache-store` parameter. You do not need to add or edit cached values manually (i.e.,
+	`token_salt`, `access_token`, `access_token_expiry`, `refresh_token` and `last_activity`); the proxy handles this.
+	
+	The password used in your email client is not used for authentication with the actual email server (this is done via
+	OAuth 2.0 in a web browser), so it can be different to your real account password, which is helpful for debugging.
+	Please note, though, that all clients that use a particular account via the proxy should use the same IMAP/POP/SMTP
+	password to avoid repeated re-authentication requests (which is the proxy's default behaviour when credential
+	decryption fails). See the proxy's README.md file for more information and further configuration options.
+	
+	Office 365 customisation:
+	- Unlike other providers, Office 365 requires an OAuth 2.0 scope that explicitly specifies `offline_access` (shown
+	in the example below) in order to allow the proxy to refresh its access token on your behalf. The proxy will still
+	work if this parameter is not included, but you will need to re-authenticate extremely often (about once per hour).
+	
+	- By default, new Azure AD clients are accessible only within your own tenant. If you are registering a new client
+	to use with the proxy (and do not want to make it available outside your own organisation) you will need to replace
+	`common` with your tenant ID in the Office 365 `permission_url` and `token_url` values below. Alternatively, you can
+	reuse credentials from an existing client registration (see the proxy's README.md file), or configure your client
+	as a multi-tenant application. For more detail about this, and guides for setting up your desktop app client, see
+	the documentation at https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app.
+	
+	- Office 365 shared mailboxes are supported: add an account entry here using the email address of the shared
+	mailbox as the account name. When asked to authenticate, log in as the user that access has been delegated to.
+	Note that Office 365 no-longer supports the `authorised.user@example.com/delegated.mailbox` username syntax here.
+	
+	- It is possible to create Office 365 clients that do not require a secret to be sent. If this is the case for your
+	setup, delete the `client_secret` line from your account's configuration entry (do not leave the default value).
+	
+	- The proxy supports the client credentials grant (CCG) and resource owner password credentials grant (ROPCG) OAuth
+	2.0 flows (both currently only known to be available for Office 365). To use either of these flows, add an account
+	entry as normal, but do not add a `permission_url` value (it does not apply, and its absence signals to the proxy to
+	use the appropriate token retrieval mechanism). An example is given at the end of the sample account entries below.
+	The CCG flow is the default in this mode; to specify the ROPCG flow add `oauth2_flow = password` in your account
+	configuration, and use a normal `oauth2_scope` value rather than the CCG-specific `.default`. Please note also that
+	Office 365's CCG flow does not support SMTP, and by default it has essentially no local access control when using
+	IMAP/POP in this mode (no user consent is involved, so the proxy cannot validate passwords). Because of this, you
+	are encouraged to enable the proxy's secret encryption option - see `encrypt_client_secret_on_first_use` at the end
+	of this file. In addition, if you are using the proxy in an environment where there is any possibility of malicious
+	access attempts before the first valid login then pre-encrypting account entries is highly recommended - see the
+	example setup script at https://github.com/simonrob/email-oauth2-proxy/issues/61#issuecomment-1259110336.
+	
+	Advanced account configuration:
+	- For most configurations the default `redirect_uri` value of `http://localhost` is correct, unless you have
+	explicitly set your OAuth 2.0 client to use a different address here (which you will need to manually redirect to
+	the proxy). Please also note that this address is `http` and not `https` (which is not supported unless you provide
+	a secure connection yourself outside of the proxy using an external tool).
+	
+	- When using the `--local-server-auth` option you will need to either run the proxy with additional privileges to
+	use the implicit default port 80 (e.g., via sudo) or specify a different port (and/or a different host if needed) -
+	for example, `redirect_uri = http://localhost:8080`. In addition, if you are using this proxy option in a setup that
+	is not directly exposed (such as a container or private network) you may also need to map `redirect_uri` traffic via
+	a private address. Once this is configured (via external tools/rules), instruct the proxy to listen here using the
+	parameter `redirect_listen_address` - for example, `redirect_listen_address = http://10.0.0.0:8080`.
+	
+	- Please note that when using `--local-server-auth` the proxy will start/stop a new local server for each incoming
+	authentication request, and does not explicitly handle repeated requests or multiple accounts authenticating using
+	the same address. To avoid clashes, it is recommended that each account has a unique `redirect_uri` (or
+	`redirect_listen_address`) value, for example by using a different port for each account.
+
+[your.office365.address@example.com]
+permission_url = https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+token_url = https://login.microsoftonline.com/common/oauth2/v2.0/token
+oauth2_scope = https://outlook.office365.com/IMAP.AccessAsUser.All https://outlook.office365.com/POP.AccessAsUser.All https://outlook.office365.com/SMTP.Send offline_access
+redirect_uri = http://localhost
+client_id = *** your client id here ***
+client_secret = *** your client secret here ***
+
+[your.email@gmail.com]
+permission_url = https://accounts.google.com/o/oauth2/auth
+token_url = https://oauth2.googleapis.com/token
+oauth2_scope = https://mail.google.com/
+redirect_uri = http://localhost
+client_id = *** your client id here ***
+client_secret = *** your client secret here ***
+
+[your.email@yahoo.co.uk]
+permission_url = https://api.login.yahoo.com/oauth2/request_auth
+token_url = https://api.login.yahoo.com/oauth2/get_token
+oauth2_scope = mail-w
+redirect_uri = http://localhost
+client_id = *** your client id here ***
+client_secret = *** your client secret here ***
+
+[your.email@aol.com]
+permission_url = https://api.login.aol.com/oauth2/request_auth
+token_url = https://api.login.aol.com/oauth2/get_token
+oauth2_scope = mail-w
+redirect_uri = http://localhost
+client_id = *** your client id here ***
+client_secret = *** your client secret here ***
+
+[your.office365.address@your-tenant.com]
+token_url = https://login.microsoftonline.com/*** your tenant id here ***/oauth2/v2.0/token
+oauth2_scope = https://outlook.office365.com/.default
+oauth2_flow = client_credentials
+redirect_uri = http://localhost
+client_id = *** your client id here ***
+client_secret = *** your client secret here ***
+
+[Advanced proxy configuration]
+documentation = The parameters below control advanced options for the proxy. In most cases you will not need to modify
+	the values in this section. If any of these values are not found, the proxy will assume the default value, which
+	can be found in the example config file (https://github.com/simonrob/email-oauth2-proxy/blob/main/emailproxy.config)
+	
+	Parameter documentation:
+	- delete_account_token_on_password_error (default = True): Once an account has been authenticated via the proxy, if
+	there is a login attempt with a different (local) password, its default behaviour is to remove the saved OAuth 2.0
+	credentials and present a new authentication request. This is a sensible default for local use as it means that a
+	password typo does not give the false impression that the proxy has somehow made the account inaccessible. However,
+	if the proxy is used in a headless (often also public-facing) context, where authentication flows are more likely to
+	be laborious or need administrator intervention, this can potentially result in a denial-of-service issue, whether
+	malicious or not. Set to False and the proxy will instead return an error when an incorrect password is provided.
+	
+	- encrypt_client_secret_on_first_use (default = False): The proxy encrypts sensitive configuration values (e.g.,
+	cached access tokens) using the password that is given when accessing an account via IMAP/POP/SMTP. It does not do
+	this for values that are not sensitive. In the most common operation mode (i.e., interactively authorising account
+	access), the `client_secret` value falls into this category - it is not actually secret, and there is no real need
+	to prevent access to it. However, when using the Office 365 client credentials grant flow there is no user involved,
+	and possession of the secret grants full access to an account. If you use this method and it is possible that others
+	may gain access to the proxy's configuration file, set `encrypt_client_secret_on_first_use` to True and the proxy
+	will replace the `client_secret` value with a new property `client_secret_encrypted` at the next token refresh. Note
+	that this option is not compatible with `allow_catch_all_accounts` unless all accounts use the same login password.
+	In addition, if you are using the proxy's `--cache-store` parameter you will need to manually remove unencrypted
+	secrets from this configuration file after the encrypted secret has been created (i.e., it will not be automatic).
+	
+	- allow_catch_all_accounts (default = False): The default behaviour of the proxy is to require a full separate
+	configuration file entry for each account. However, when proxying multiple accounts from the same domain it can be
+	cumbersome to have to create multiple near-identical configuration profiles. To simplify this the proxy supports
+	catch-all accounts when this option is set to True. Domain-level accounts are configured using section headings. For
+	example, add a section [@domain.com] with all of the standard required account values, and the proxy will intercept
+	authentication requests for all usernames at `domain.com`. Whenever a previously unseen account attempts to connect,
+	account authorisation will take place as normal, and the proxy will automatically create a new account-level section
+	that does not need to be configured manually. Any account-level configuration will override domain-level values.
+	If needed, the global catch-all section [@] can also be used. Please note that this option is not compatible with
+	`encrypt_client_secret_on_first_use` unless all IMAP/POP/SMTP accounts at the same domain use the same password.
+
+[emailproxy]
+delete_account_token_on_password_error = True
+encrypt_client_secret_on_first_use = False
+allow_catch_all_accounts = False

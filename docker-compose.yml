@@ -1,0 +1,30 @@
+version: '3'
+services:
+  oauth2-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.oauth2-proxy
+    image: oauth2-proxy
+    container_name: oauth2-proxy
+    restart: unless-stopped
+    environment:
+      - TZ=America/Sao_Paulo
+    volumes:
+      - ./conf:/conf
+    #entrypoint: [ 'sleep', '9000' ]
+
+  imapfilter:
+    build:
+      context: .
+      dockerfile: Dockerfile.imapfilter
+    image: imapfilter
+    container_name: imapfilter
+    restart: unless-stopped
+    environment:
+      - TZ=America/Sao_Paulo
+    volumes:
+      - ./conf:/conf
+    depends_on:
+      - oauth2-proxy
+    #entrypoint: [ 'sleep', '9000' ]
+
